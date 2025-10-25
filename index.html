@@ -3,22 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tailwind CSS Example</title>
+    <title>ဖုန်းနံပါတ်ဖြင့် ဝင်ရောက်ခြင်း</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* OTP Input အတွက် စတိုင်လ် */
+        .otp-input {
+            width: 3rem; /* Input ကွက် အကျယ် */
+            height: 3rem; /* Input ကွက် အမြင့် */
+            text-align: center;
+            font-size: 1.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            transition: border-color 0.3s;
+        }
+        .otp-input:focus {
+            border-color: #2563eb; /* Focus ရရင် အပြာရောင်ပြောင်း */
+            outline: none;
+        }
+    </style>
 </head>
-<body>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
-    <div class="p-6 max-w-sm mx-auto bg-white rounded-xl shadow-lg flex items-center space-x-4 mt-10">
-        <div class="text-xl font-medium text-black">
-            Tailwind နမူနာ Card
+    <div id="login-container" class="w-full max-w-md bg-white p-8 rounded-xl shadow-2xl">
+
+        <div id="step-1-phone-input" class="space-y-6">
+            <h1 class="text-3xl font-bold text-center text-gray-800">အကောင့်ဝင်ရောက်ရန်</h1>
+            <p class="text-center text-gray-500">
+                သင့်အကောင့်ကို အတည်ပြုရန် ဖုန်းနံပါတ်ကို ထည့်သွင်းပါ။
+            </p>
+
+            <div class="flex border border-gray-300 rounded-lg overflow-hidden">
+                <select class="p-3 bg-gray-50 border-r border-gray-300 focus:outline-none" aria-label="Country Code">
+                    <option value="+95">+95 (MM)</option>
+                    <option value="+66">+66 (TH)</option>
+                    <option value="+1">+1 (US)</option>
+                </select>
+                <input
+                    type="tel"
+                    id="phone-number"
+                    placeholder="9xxxxxxxxx"
+                    class="flex-1 p-3 text-lg focus:outline-none"
+                    maxlength="10"
+                    pattern="[0-9]*"
+                    inputmode="numeric"
+                >
+            </div>
+            
+            <button
+                id="get-otp-btn"
+                class="w-full bg-blue-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 transition duration-150"
+                onclick="showOtpScreen()"
+            >
+                OTP ကုဒ် ရယူရန်
+            </button>
         </div>
-        <p class="text-gray-500">
-            Utility Classes များ ပေါင်းစပ်ထားသော Card ပါ။
-        </p>
-        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-            Click Me
-        </button>
+        
+        <div id="step-2-otp-verify" class="space-y-6 hidden">
+            <h1 class="text-3xl font-bold text-center text-gray-800">ကုဒ်အတည်ပြုခြင်း</h1>
+            <p class="text-center text-gray-500">
+                သင်၏ <span id="display-phone" class="font-medium text-gray-700"></span> သို့ ပေးပို့ထားသော ၆ လုံးပါ အတည်ပြုကုဒ်ကို ထည့်သွင်းပါ။
+            </p>
+
+            <div id="otp-inputs" class="flex justify-center space-x-2">
+                <input type="tel" maxlength="1" class="otp-input" inputmode="numeric">
+                <input type="tel" maxlength="1" class="otp-input" inputmode="numeric">
+                <input type="tel" maxlength="1" class="otp-input" inputmode="numeric">
+                <input type="tel" maxlength="1" class="otp-input" inputmode="numeric">
+                <input type="tel" maxlength="1" class="otp-input" inputmode="numeric">
+                <input type="tel" maxlength="1" class="otp-input" inputmode="numeric">
+            </div>
+
+            <div class="text-center text-sm">
+                <p id="resend-timer" class="text-gray-500">ကုဒ်မရသေးဘူးလား? <span class="font-bold text-blue-600">30 စက္ကန့်</span> စောင့်ပြီး ပြန်ပို့ရန်</p>
+                <a href="#" id="resend-link" class="text-blue-600 font-medium hidden" onclick="resendCode(event)">ကုဒ် ပြန်လည်ပေးပို့ရန်</a>
+                <a href="#" class="text-sm text-gray-500 ml-3" onclick="showPhoneInputScreen()">ဖုန်းနံပါတ် ပြောင်းလဲရန်</a>
+            </div>
+
+            <button
+                id="verify-otp-btn"
+                class="w-full bg-green-600 text-white py-3 rounded-lg text-lg font-semibold hover:bg-green-700 transition duration-150"
+                disabled
+            >
+                အတည်ပြု၍ ဝင်ရောက်မည်
+            </button>
+        </div>
+
     </div>
 
-</body>
-</html>
+    <script>
+        const step1 = document.getElementById('step-1-phone-input');
+        const step2 = document.getElementById('step-2-otp-verify');
+        const phoneNumberInput = document.getElementById('phone-number');
+        const displayPhone = document.getElementById('display-phone');
+        const otpInputs = Array.from(document.querySelectorAll('#otp-inputs input'));
+        const verifyOtpBtn = document.getElementById('verify-otp-btn');
+        const resendTimerEl = document.getElementById('resend-timer');
+        const resendLinkEl = document.getElementById('resend-link');
+
+        let resendCountdown = 30;
+        let timerInterval;
+        
+        // ===================================
+        // FUNCTION: မျက်နှာပြင် ပြောင်းလဲခြင်း
+        // ===================================
+
+        function showOtpScreen() {
+            const countryCode = document.querySelector('#step-1-phone-input select').value;
+            const fullNumber = countryCode + phoneNumberInput.value;
+
+            // ဖုန်းနံပါတ် မှန်မမှန် စစ်ဆေးရန် (ရိုးရှင်းသော စစ်ဆေးမှု)
+            if (phoneNumberInput.value.length < 8) {
+                alert('ဖုန်းနံပါတ် အရှည်ကို ပြည့်စုံစွာ ထည့်ပါ။');
+                return;
+            }
+
+            displayPhone.textContent = fullNumber;
+            step1.classList.add('hidden');
+            step2.classList.remove('hidden');
+
+            // Timer စတင်ရေတွက်ခြင်း
+            startResendTimer();
+        }
+
+        function showPhoneInputScreen() {
+            step2.classList.add('hidden');
+            step1.classList.remove('hidden');
+            clearInterval(timerInterval); // Timer ရပ်ခြင်း
+        }
+
+        function startResendTimer() {
+            resendCountdown = 30; // 30 စက္ကန့်မှ စတင်မည်
+            resendLinkEl.classList.add('hidden');
+            resendTimerEl.classList.remove('hidden');
+            resendTimerEl.innerHTML = `ကုဒ်မရသေးဘူးလား? <span class="font-bold text-blue-600">${resendCountdown} စက္ကန့်</span> စောင့်ပြီး ပြန်ပို့ရန်`;
+            
+            timerInterval = setInterval(() => {
+                resendCountdown--;
+                if (resendCountdown > 0) {
+                    resendTimerEl.innerHTML = `ကုဒ်မရသေးဘူးလား? <span class="font-bold text-blue-600">${resendCountdown} စက္ကန့်</span> စောင့်ပြီး ပြန်ပို့ရန်`;
+                } else {
+                    clearInterval(timerInterval);
+                    resendTimerEl.classList.add('hidden');
+                    resendLinkEl.classList.remove('hidden');
+                }
+            }, 1000);
+        }
+
+        function resendCode(event) {
+            event.preventDefault();
+            alert('ကုဒ်ကို ပြန်လည်ပေးပို့လိုက်ပါပြီ။');
+            // Backend API ကို ခေါ်ဆိုပြီးနောက် Timer ပြန်စပါ
+            startResendTimer();
+        }
+
+
+        // ===================================
+        // FUNCTION: OTP Input နှင့် အတည်ပြုခြင်း
+        // ===================================
+        
+        otpInputs.forEach((input, index) => {
+            // ဂဏန်းသာ ဝင်ရောက်စေရန်
+            input.addEventListener('input', (e) => {
+                const value = e.target.value;
+                if (!/^[0-9]$/.test(value)) {
